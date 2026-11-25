@@ -1,8 +1,11 @@
 package uz.cybergram;
 
+import java.net.IDN;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Internetsiz, telefonning o'zida ishlaydigan xavfsizlik tekshiruvi.
@@ -18,6 +21,10 @@ public final class LocalRules {
         public final List<String> links = new ArrayList<>();
 
         void add(SafetyVerdict v, String reason) {
+            if (v != SafetyVerdict.SAFE) {
+                reasons.remove(noDanger());
+                reasons.remove(noDangerLinks());
+            }
             verdict = verdict.max(v);
             if (!reasons.contains(reason)) {
                 reasons.add(reason);
@@ -52,6 +59,94 @@ public final class LocalRules {
     private static final String[] OFFICIAL_DOMAINS = {
             "t.me", "telegram.me", "telegram.org", "telegra.ph", "telesco.pe", "fragment.com"
     };
+
+    /** To'lov xizmatlari va banklar: nom → rasmiy domenlar. Nom boshqa saytda ishlatilsa — soxta sayt. */
+    private static final String[][] BRANDS = {
+            {"click", "click.uz"},
+            {"payme", "payme.uz"},
+            {"uzum", "uzum.uz", "uzumbank.uz", "uzum.com"},
+            {"paynet", "paynet.uz"},
+            {"humo", "humocard.uz", "humo.uz", "humo.tj"},
+            {"uzcard", "uzcard.uz"},
+            {"kapitalbank", "kapitalbank.uz"},
+            {"agrobank", "agrobank.uz"},
+            {"hamkorbank", "hamkorbank.uz"},
+            {"ipakyuli", "ipakyulibank.uz"},
+            {"ipakyulibank", "ipakyulibank.uz"},
+            {"anorbank", "anorbank.uz"},
+            {"tbc", "tbcbank.uz"},
+            {"tbcbank", "tbcbank.uz"},
+            {"xazna", "xazna.uz"},
+            {"mygov", "my.gov.uz", "gov.uz"},
+            {"soliq", "soliq.uz"},
+    };
+
+    /** O'xshatib yasaladigan nomlar: asl nom → rasmiy domenlar. */
+    private static final String[][] LOOKALIKE = {
+            {"click", "click.uz"},
+            {"payme", "payme.uz"},
+            {"uzumbank", "uzumbank.uz"},
+            {"paynet", "paynet.uz"},
+            {"humocard", "humocard.uz"},
+            {"uzcard", "uzcard.uz"},
+            {"kapitalbank", "kapitalbank.uz"},
+            {"agrobank", "agrobank.uz"},
+            {"hamkorbank", "hamkorbank.uz"},
+            {"ipakyulibank", "ipakyulibank.uz"},
+            {"anorbank", "anorbank.uz"},
+            {"tbcbank", "tbcbank.uz"},
+            {"xazna", "xazna.uz"},
+            {"soliq", "soliq.uz"},
+            {"telegram", "telegram.org", "t.me", "telegram.me"},
+            {"google", "google.com", "google.co.uz"},
+            {"youtube", "youtube.com", "youtu.be"},
+            {"instagram", "instagram.com"},
+            {"facebook", "facebook.com"},
+            {"whatsapp", "whatsapp.com"},
+    };
+
+    /** Haqiqiy, boshqa ma'noli so'zlar — o'xshash deb hisoblanmaydi. */
+    private static final String[] LOOKALIKE_EXCEPT = {"telegraf", "goggles", "clicks", "googlee"};
+
+    /** Xavfli xabarlar ichidagi havolalar: havola bosilganda xabar konteksti ham hisobga olinadi. */
+    private static final int CONTEXT_MAX = 200;
+    private static final Map<String, String> CONTEXT = new LinkedHashMap<String, String>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+            return size() > CONTEXT_MAX;
+        }
+    };
+
+    private static String contextKey(String url) {
+        String u = stripQuery(url.toLowerCase(Locale.ROOT).trim());
+        u = u.replaceFirst("^[a-z]+://", "").replaceFirst("^www\\.", "");
+        while (u.endsWith("/")) {
+            u = u.substring(0, u.length() - 1);
+        }
+        return u;
+    }
+
+    /** Havola xavfli xabar ichida kelgan bo'lsa — sababini qaytaradi, aks holda null. */
+    public static String contextReason(String url) {
+        if (url == null) {
+            return null;
+        }
+        synchronized (CONTEXT) {
+            return CONTEXT.get(contextKey(url));
+        }
+    }
+
+    private static void rememberContext(Result r) {
+        if (r.verdict != SafetyVerdict.DANGEROUS || r.links.isEmpty()) {
+            return;
+        }
+        String reason = L.t("Bu havola firibgarlik belgilari bor xabar ichida kelgan.", "Эта ссылка пришла в сообщении с признаками мошенничества.");
+        synchronized (CONTEXT) {
+            for (String link : r.links) {
+                CONTEXT.put(contextKey(link), reason);
+            }
+        }
+    }
 
     private static final String[] SHORTENERS = {
             "bit.ly", "tinyurl.com", "cutt.ly", "goo.gl", "t.ly", "is.gd", "clck.ru",
@@ -148,6 +243,7 @@ public final class LocalRules {
         if (r.reasons.isEmpty()) {
             r.reasons.add(r.links.isEmpty() ? noDanger() : noDangerLinks());
         }
+        rememberContext(r);
         return r;
     }
 
@@ -159,6 +255,42 @@ public final class LocalRules {
         }
         if (!matchesDomain(host, OFFICIAL_DOMAINS) && looksLikeTelegram(host)) {
             r.add(SafetyVerdict.DANGEROUS, "\"" + host + "\" — " + L.t("Telegram'ga o'xshatilgan soxta manzil. Rasmiy manzillar: t.me va telegram.org.", "поддельный адрес, похожий на Telegram. Официальные адреса: t.me и telegram.org."));
+        }
+        String brand = fakeBrand(host);
+        if (brand == null && !looksLikeTelegram(host)) {
+            String[] look = lookalike(host);
+            if (look != null) {
+                SafetyVerdict v;
+                String how;
+                switch (look[2]) {
+                    case "0":
+                        v = SafetyVerdict.DANGEROUS;
+                        how = L.t("harflari o'xshash belgilarga (raqam yoki boshqa alifbo) almashtirilgan", "буквы заменены похожими символами (цифрами или буквами другого алфавита)");
+                        break;
+                    case "3":
+                        v = isFinancial(look[0]) ? SafetyVerdict.DANGEROUS : SafetyVerdict.SUSPICIOUS;
+                        how = L.t("nomi ishlatilgan, lekin bu rasmiy sayt emas", "используется название, но это не официальный сайт");
+                        break;
+                    default:
+                        v = "2".equals(look[2]) ? SafetyVerdict.DANGEROUS : SafetyVerdict.SUSPICIOUS;
+                        how = L.t("bitta harf bilan farq qiladi", "отличается одной буквой");
+                        break;
+                }
+                r.add(v, "\"" + host + "\" — " + L.t("\"" + look[0] + "\" nomiga o'xshatilgan (" + how + "). Rasmiy manzil: " + look[1] + ". Soxta sayt bo'lishi mumkin.",
+                        "похож на «" + look[0] + "» (" + how + "). Официальный адрес: " + look[1] + ". Может быть поддельным сайтом."));
+            }
+        }
+        if (brand != null) {
+            r.add(SafetyVerdict.DANGEROUS, "\"" + host + "\" — " + L.t("\"" + brand + "\" nomi ishlatilgan, lekin bu uning rasmiy sayti emas. Soxta to'lov yoki bank sahifasi bo'lishi mumkin — karta ma'lumotlarini kiritmang.", "используется название «" + brand + "», но это не его официальный сайт. Может быть поддельной страницей оплаты или банка — не вводите данные карты."));
+        }
+        if (!TrustedSites.isTrusted(host)) {
+            String bait = TrustedSites.baitWord(host);
+            if (bait != null) {
+                r.add(SafetyVerdict.SUSPICIOUS, "\"" + host + "\" — " + L.t("sayt nomida firibgarlar ko'p ishlatadigan so'z bor (\"" + bait + "\").", "в названии сайта есть слово, популярное у мошенников («" + bait + "»)."));
+            }
+            if (TrustedSites.isOpenHosting(host)) {
+                r.add(SafetyVerdict.SUSPICIOUS, "\"" + host + "\" — " + L.t("bepul hostingdagi sahifa: uni istalgan odam ochishi mumkin, soxta sahifalar ko'p uchraydi.", "страница на бесплатном хостинге: её может создать кто угодно, поддельные страницы встречаются часто."));
+            }
         }
         if (host.contains("xn--")) {
             r.add(SafetyVerdict.SUSPICIOUS, "\"" + host + "\" — " + L.t("manzilida boshqa alifbodagi o'xshash harflar ishlatilgan.", "в адресе использованы похожие буквы из другого алфавита."));
@@ -185,6 +317,152 @@ public final class LocalRules {
         if (lower.startsWith("http://")) {
             r.note(L.t("Havola shifrlanmagan (http) ulanishdan foydalanadi.", "Ссылка использует незашифрованное соединение (http)."));
         }
+    }
+
+    /**
+     * Mashhur nomga o'xshatilgan domen: c1ick.uz, paymе.uz (kirill "е"), kapitalbnak.uz, kapital-bank.com.
+     * @return {asl nom, rasmiy domen, tur} — tur: "0" o'xshash belgilar, "2" bitta harf (uzun nom), "1" bitta harf (qisqa nom); yo'q bo'lsa null
+     */
+    static String[] lookalike(String host) {
+        String h = host;
+        try {
+            h = IDN.toUnicode(host).toLowerCase(Locale.ROOT);
+        } catch (Exception ignore) {
+        }
+        if (TrustedSites.isTrusted(host)) {
+            return null;
+        }
+        for (String[] b : LOOKALIKE) {
+            for (int k = 1; k < b.length; k++) {
+                if (h.equals(b[k]) || h.endsWith("." + b[k])) {
+                    return null;
+                }
+            }
+        }
+        String[] labels = h.split("\\.");
+        if (labels.length < 2) {
+            return null;
+        }
+        List<String> cands = new ArrayList<>();
+        for (int i = 0; i < labels.length - 1; i++) {
+            if (labels[i].contains("-")) {
+                cands.add(labels[i].replace("-", ""));
+            }
+            for (String t : labels[i].split("-")) {
+                if (t.length() >= 4) {
+                    cands.add(t);
+                }
+            }
+        }
+        for (String c : cands) {
+            for (String ex : LOOKALIKE_EXCEPT) {
+                if (c.equals(ex)) {
+                    c = null;
+                    break;
+                }
+            }
+            if (c == null) {
+                continue;
+            }
+            String sc = skeleton(c);
+            for (String[] b : LOOKALIKE) {
+                String brand = b[0];
+                if (c.equals(brand)) {
+                    // "kapital-bank", "google-bonus" kabi: asl nom ishlatilgan
+                    return new String[]{brand, b[1], "3"};
+                }
+                if (sc.equals(skeleton(brand))) {
+                    return new String[]{brand, b[1], "0"};
+                }
+                if (brand.length() >= 6 && c.length() >= 5 && Math.abs(c.length() - brand.length()) <= 1
+                        && distance(c, brand) == 1) {
+                    return new String[]{brand, b[1], brand.length() >= 7 ? "2" : "1"};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isFinancial(String brand) {
+        for (String[] b : BRANDS) {
+            if (brand.startsWith(b[0]) || b[0].startsWith(brand)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Ko'zga bir xil ko'rinadigan belgilarni bitta shaklga keltiradi. */
+    static String skeleton(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = Character.toLowerCase(s.charAt(i));
+            switch (c) {
+                case 'а': case 'α': case '4': case '@': c = 'a'; break;
+                case 'е': case 'ё': case 'є': case '3': c = 'e'; break;
+                case 'о': case 'ο': case '0': c = 'o'; break;
+                case 'р': case 'ρ': c = 'p'; break;
+                case 'с': case 'ϲ': c = 'c'; break;
+                case 'у': case 'γ': c = 'y'; break;
+                case 'х': case 'χ': c = 'x'; break;
+                case 'к': case 'κ': c = 'k'; break;
+                case 'м': c = 'm'; break;
+                case 'ѕ': case '5': case '$': c = 's'; break;
+                case 'ԁ': c = 'd'; break;
+                case 'ј': c = 'j'; break;
+                case 'ԛ': c = 'q'; break;
+                case 'ν': c = 'v'; break;
+                case '7': c = 't'; break;
+                case '8': c = 'b'; break;
+                case '9': c = 'g'; break;
+                case 'і': case 'ӏ': case 'ι': case 'ɩ': case '1': case '!': case '|': case 'i': c = 'l'; break;
+                default: break;
+            }
+            sb.append(c);
+        }
+        return sb.toString().replace("rn", "m").replace("vv", "w");
+    }
+
+    /** Damerau-Levenshtein (qo'shni harflar almashuvi ham 1 hisoblanadi). */
+    static int distance(String a, String b) {
+        int n = a.length(), m = b.length();
+        int[][] d = new int[n + 1][m + 1];
+        for (int i = 0; i <= n; i++) d[i][0] = i;
+        for (int j = 0; j <= m; j++) d[0][j] = j;
+        for (int i = 1; i <= n; i++) {
+            for (int j = 1; j <= m; j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                d[i][j] = Math.min(Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1), d[i - 1][j - 1] + cost);
+                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) {
+                    d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+                }
+            }
+        }
+        return d[n][m];
+    }
+
+    /** Sayt nomida bank/to'lov xizmati nomi bor, lekin domen rasmiy emas — nomni qaytaradi. */
+    static String fakeBrand(String host) {
+        String[] labels = host.split("\\.");
+        if (labels.length < 2) {
+            return null;
+        }
+        for (int i = 0; i < labels.length - 1; i++) {
+            for (String token : labels[i].split("-")) {
+                for (String[] b : BRANDS) {
+                    if (!token.equals(b[0])) {
+                        continue;
+                    }
+                    for (int k = 1; k < b.length; k++) {
+                        if (host.equals(b[k]) || host.endsWith("." + b[k])) {
+                            return null;
+                        }
+                    }
+                    return b[0];
+                }
+            }
+        }
+        return null;
     }
 
     private static boolean looksLikeTelegram(String host) {

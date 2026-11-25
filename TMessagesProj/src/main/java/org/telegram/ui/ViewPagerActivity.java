@@ -139,6 +139,9 @@ public abstract class ViewPagerActivity extends BaseFragment {
         return true;
     }
 
+    protected boolean cyberAllowSwipeAtStart() {
+        return false;
+    }
     protected boolean canScrollForward(MotionEvent ev) {
         return true;
     }
@@ -518,6 +521,11 @@ public abstract class ViewPagerActivity extends BaseFragment {
         @Override
         protected boolean canScrollForward(MotionEvent e) {
             return ViewPagerActivity.this.canScrollForward(e);
+        }
+
+        @Override
+        protected boolean onBackProgress(float progress) {
+            return ViewPagerActivity.this.cyberAllowSwipeAtStart();
         }
 
         @Override

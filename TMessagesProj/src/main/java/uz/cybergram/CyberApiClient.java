@@ -20,7 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * CyberGram serveri (Vercel) bilan ishlash: /api/scan, /api/summarize, /api/assistant.
+ * CyberGram serveri (Vercel) bilan ishlash: /api/scan va /api/summarize.
  */
 public final class CyberApiClient {
 

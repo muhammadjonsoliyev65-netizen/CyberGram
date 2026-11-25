@@ -38,10 +38,29 @@ public final class LinkGuard {
         if (url == null || !CyberSettings.linkGuard(context)) {
             return false;
         }
+        final String msgContext = LocalRules.contextReason(url);
         final LocalRules.Result result = LocalRules.analyze(url, null);
+        if (msgContext != null) {
+            if (TrustedSites.isTrusted(LinkExtractor.host(url)) && result.verdict == SafetyVerdict.SAFE) {
+                // Rasmiy sayt, lekin shubhali xabar ichida — bloklanmaydi, foydalanuvchi roziligi bilan ochiladi
+                result.add(SafetyVerdict.SUSPICIOUS, L.t(
+                        "Bu sayt rasmiy, lekin u firibgarlik belgilari bor xabar ichida kelgan. Ochsangiz ham, SMS kod, parol yoki karta ma'lumotlarini hech kimga bermang.",
+                        "Этот сайт официальный, но он пришёл в сообщении с признаками мошенничества. Даже если откроете, никому не сообщайте SMS-код, пароль или данные карты."));
+            } else {
+                result.add(SafetyVerdict.DANGEROUS, msgContext);
+            }
+        }
         final Activity activity = findActivity(context);
         if (activity == null) {
             return result.verdict == SafetyVerdict.DANGEROUS;
+        }
+        // AI shu saytni avval tekshirgan bo'lsa — uning bahosi ham hisobga olinadi
+        final String host = LinkExtractor.host(url);
+        SafetyVerdict remembered = TrustedSites.aiVerdict(host);
+        if (remembered != null && remembered != SafetyVerdict.SAFE) {
+            result.add(remembered, L.t("AI bu saytni avval tekshirgan va ", "ИИ ранее проверял этот сайт и оценил его как: ")
+                    + L.t(remembered == SafetyVerdict.DANGEROUS ? "xavfli deb baholagan." : "shubhali deb baholagan.",
+                    remembered == SafetyVerdict.DANGEROUS ? "опасный." : "подозрительный."));
         }
         if (result.verdict == SafetyVerdict.DANGEROUS) {
             showDialog(activity, url, result, openAnyway);
@@ -49,34 +68,90 @@ public final class LinkGuard {
         }
 
         final String normalized = SafeBrowsingClient.normalize(url);
-        if (normalized == null || !SafeBrowsingClient.isConfigured() || !CyberSettings.onlineCheck(context)) {
+        final boolean online = CyberSettings.onlineCheck(context);
+        final boolean useSafeBrowsing = online && normalized != null && SafeBrowsingClient.isConfigured();
+        final boolean useServer = online && CyberApiClient.isConfigured() && !host.isEmpty() && !TrustedSites.isTrusted(host);
+        if (!useSafeBrowsing && !useServer) {
             if (result.verdict == SafetyVerdict.SAFE) {
-                return false;
+                return askIfUnknown(activity, url, host, result, openAnyway, false);
             }
             showDialog(activity, url, result, openAnyway);
             return true;
         }
 
-        // Onlayn tekshiruv (Google Safe Browsing)
+        // Onlayn tekshiruv: 1) Google Safe Browsing, 2) CyberGram server (sayt yoshi, sahifadagi formalar)
         final AlertDialog loader = new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER);
         loader.setCanCancel(false);
         loader.show();
-        SafeBrowsingClient.check(Collections.singletonList(url), (threats, ok) -> {
-            try {
-                loader.dismiss();
-            } catch (Exception ignore) {
+        final Runnable serverStep = () -> {
+            if (!useServer) {
+                finish(activity, loader, url, host, result, openAnyway, false);
+                return;
             }
-            String threat = threats.get(normalized);
-            if (threat != null) {
-                result.addOnline(url, threat);
-            }
-            if (result.verdict == SafetyVerdict.SAFE) {
+            UrlCheck.check(url, info -> {
+                boolean established = UrlCheck.apply(info, result);
+                finish(activity, loader, url, host, result, openAnyway, established);
+            });
+        };
+        if (useSafeBrowsing) {
+            SafeBrowsingClient.check(Collections.singletonList(url), (threats, ok) -> {
+                String threat = threats.get(normalized);
+                if (threat != null) {
+                    result.addOnline(url, threat);
+                }
+                serverStep.run();
+            });
+        } else {
+            serverStep.run();
+        }
+        return true;
+    }
+
+    private static void finish(Activity activity, AlertDialog loader, String url, String host, LocalRules.Result result,
+                               Runnable openAnyway, boolean established) {
+        try {
+            loader.dismiss();
+        } catch (Exception ignore) {
+        }
+        if (result.verdict == SafetyVerdict.SAFE) {
+            if (!askIfUnknown(activity, url, host, result, openAnyway, established)) {
                 bypassOnce = true;
                 openAnyway.run();
-            } else {
-                showDialog(activity, url, result, openAnyway);
             }
+        } else {
+            showDialog(activity, url, result, openAnyway);
+        }
+    }
+
+    /**
+     * Xavf topilmagan, lekin sayt notanish bo'lsa — foydalanuvchidan so'raydi.
+     * @return true bo'lsa, oyna ko'rsatildi (havolani hozir ochmaslik kerak)
+     */
+    private static boolean askIfUnknown(Activity activity, String url, String host, LocalRules.Result result, Runnable openAnyway,
+                                        boolean established) {
+        if (established || !CyberSettings.askUnknown(activity) || host.isEmpty() || TrustedSites.isTrusted(host)
+                || TrustedSites.aiVerdict(host) == SafetyVerdict.SAFE) {
+            return false;
+        }
+        final Runnable open = () -> {
+            bypassOnce = true;
+            openAnyway.run();
+        };
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setTitle(L.t("🛡 Notanish sayt", "🛡 Незнакомый сайт"));
+        builder.setMessage(host + "\n\n"
+                + L.t("Telefondagi tekshiruv xavf topmadi, lekin bu sayt ishonchli saytlar ro'yxatida yo'q. Yangi soxta saytlar hali hech qaysi bazaga tushmagan bo'lishi mumkin.\n\nOchishdan oldin AI bilan tekshirib ko'rasizmi?",
+                "Проверка на телефоне не нашла угроз, но этого сайта нет в списке надёжных. Новые поддельные сайты могут ещё не попасть ни в одну базу.\n\nПроверить с помощью ИИ перед открытием?"));
+        builder.setPositiveButton(L.t("🤖 Tekshirish", "🤖 Проверить"), (dialog, which) -> {
+            dialog.dismiss();
+            CyberAiDialog.scan(activity, Redact.url(url), result.verdict, open);
         });
+        builder.setNegativeButton(L.t("Ochish", "Открыть"), (dialog, which) -> {
+            dialog.dismiss();
+            open.run();
+        });
+        builder.setNeutralButton(L.t("Bekor", "Отмена"), (dialog, which) -> dialog.dismiss());
+        builder.show();
         return true;
     }
 
@@ -91,6 +166,9 @@ public final class LinkGuard {
         sb.append("\n\n").append(url).append("\n\n");
         for (String reason : result.reasons) {
             sb.append("• ").append(reason).append("\n");
+        }
+        for (String note : result.notes) {
+            sb.append("ℹ️ ").append(note).append("\n");
         }
         if (result.online) {
             sb.append(SafeBrowsingClient.ADVISORY.trim()).append("\n");

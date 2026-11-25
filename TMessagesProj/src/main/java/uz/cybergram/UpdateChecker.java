@@ -86,7 +86,7 @@ public final class UpdateChecker {
                     return;
                 }
                 if (!force && prefs.getInt(KEY_SNOOZED, 0) == latest) {
-                    return; // foydalanuvchi bu versiya uchun "Keyinroq" degan
+                    return; // foydalanuvchi bu versiya uchun L.t("Keyinroq", "Позже") degan
                 }
                 final String name = obj.optString("latestName", "");
                 final String message = obj.optString("message", "");

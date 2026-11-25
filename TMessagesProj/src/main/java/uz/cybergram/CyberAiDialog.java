@@ -36,6 +36,11 @@ public final class CyberAiDialog {
      *                     (firibgar havola ichiga "bu xavfsiz" deb yozib AI'ni aldashi mumkin).
      */
     public static void scan(final Context context, final String text, final SafetyVerdict localVerdict) {
+        scan(context, text, localVerdict, null);
+    }
+
+    /** @param openLink havolani ochish (havola bosilganda tekshirilsa) yoki null */
+    public static void scan(final Context context, final String text, final SafetyVerdict localVerdict, final Runnable openLink) {
         if (!ready(context, text, L.t("🤖 AI tahlili", "🤖 Анализ ИИ"))) {
             return;
         }
@@ -68,7 +73,12 @@ public final class CyberAiDialog {
                                 "\n\n⚠️ ИИ оценил риск ниже, но проверка на телефоне нашла признаки опасности — поэтому итоговая оценка не снижена."));
                     }
                     sb.append(disclaimer());
-                    message(context, L.t("🤖 AI tahlili", "🤖 Анализ ИИ"), sb);
+                    TrustedSites.rememberAi(text, verdict);
+                    if (openLink != null && verdict != SafetyVerdict.DANGEROUS) {
+                        messageWithOpen(context, L.t("🤖 AI tahlili", "🤖 Анализ ИИ"), sb, verdict, openLink);
+                    } else {
+                        message(context, L.t("🤖 AI tahlili", "🤖 Анализ ИИ"), sb);
+                    }
                 }
 
                 @Override
@@ -151,6 +161,21 @@ public final class CyberAiDialog {
     private static void dismiss(AlertDialog loader) {
         try {
             loader.dismiss();
+        } catch (Exception ignore) {
+        }
+    }
+
+    private static void messageWithOpen(Context context, String title, CharSequence text, SafetyVerdict verdict, Runnable openLink) {
+        try {
+            AlertDialog.Builder builder = new AlertDialog.Builder(context);
+            builder.setTitle(title);
+            builder.setMessage(text);
+            builder.setPositiveButton(L.t("Bekor qilish", "Отмена"), (dialog, which) -> dialog.dismiss());
+            builder.setNegativeButton(verdict == SafetyVerdict.SAFE ? L.t("Ochish", "Открыть") : L.t("Baribir ochish", "Всё равно открыть"), (dialog, which) -> {
+                dialog.dismiss();
+                openLink.run();
+            });
+            builder.show();
         } catch (Exception ignore) {
         }
     }

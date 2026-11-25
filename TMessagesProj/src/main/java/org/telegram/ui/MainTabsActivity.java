@@ -140,7 +140,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         Bulletin.Delegate delegate = new Bulletin.Delegate() {
             @Override
             public int getBottomOffset(int tag) {
-                return navigationBarHeight + dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN);
+                return navigationBarHeight + (uz.cybergram.SideMenu.enabled() ? 0 : dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN));
             }
         };
 
@@ -401,7 +401,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
-
+        if (uz.cybergram.SideMenu.enabled()) {
+            tabsViewWrapper.setVisibility(View.GONE);
+        }
         updateLayoutWrapper = new UpdateLayoutWrapper(context);
         contentView.addView(updateLayoutWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
 
@@ -788,7 +790,10 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     protected int getFragmentsCount() {
         return TABS_COUNT;
     }
-
+    @Override
+    protected boolean cyberAllowSwipeAtStart() {
+        return uz.cybergram.SideMenu.enabled();
+    }
     @Override
     protected int getStartPosition() {
         return POSITION_CHATS;
@@ -914,6 +919,13 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private boolean canScrollInternal(MotionEvent ev, boolean forward) {
+        if (uz.cybergram.SideMenu.enabled()) {
+            if (!forward && viewPager.getCurrentPosition() == POSITION_CHATS && dialogsActivity != null
+                    && dialogsActivity.canParentTabsSlide(ev, false)) {
+                uz.cybergram.SideMenu.show(dialogsActivity);
+            }
+            return false;
+        }
         final BaseFragment fragment = getCurrentVisibleFragment();
         if (fragment instanceof TabFragmentDelegate) {
             final TabFragmentDelegate delegate = (TabFragmentDelegate) fragment;
@@ -1084,6 +1096,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         final float hide = 1f - AndroidUtilities.getNavigationBarThirdButtonsFactor(0, 1f, navigationBarHeight);
         float alpha = (1f - isProfile * hide) * animatorTabsVisible.getFloatValue();
         if (tabletLayout) {
+            alpha = 0.0f;
+        }
+        if (uz.cybergram.SideMenu.enabled()) {
             alpha = 0.0f;
         }
 

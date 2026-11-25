@@ -2897,8 +2897,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
 
         BirthdayController.getInstance(currentAccount).check();
-        additionNavigationBarHeight = hasMainTabs ? dp(MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
-        additionFloatingButtonOffset = hasMainTabs ? dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN) : 0;
+        additionNavigationBarHeight = hasMainTabs && !uz.cybergram.SideMenu.enabled() ? dp(MAIN_TABS_HEIGHT_WITH_MARGINS) : 0;
+        additionFloatingButtonOffset = hasMainTabs && !uz.cybergram.SideMenu.enabled() ? dp(DialogsActivity.MAIN_TABS_HEIGHT + DialogsActivity.MAIN_TABS_MARGIN) : 0;
 
         return true;
     }
@@ -3141,6 +3141,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         menu.addItem(9100, R.drawable.cybergram_shield).setOnClickListener(v -> uz.cybergram.CyberMenu.show(getParentActivity()));
         uz.cybergram.UpdateChecker.check(context);
         uz.cybergram.Welcome.showOnce(context);
+        if (hasMainTabs && !onlySelect && folderId == 0 && communityId == 0 && uz.cybergram.SideMenu.enabled()) {
+            actionBar.setBackButtonDrawable(new MenuDrawable());
+        }
         searchItem = menu.addItem(0, R.drawable.outline_header_search).setIsSearchField(true, false);
         searchItem.setOnClickListener(v -> {
             showSearch(true, false, true);
@@ -3820,6 +3823,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         } else {
                             hideActionMode(true);
                         }
+                    } else if (hasMainTabs && !onlySelect && folderId == 0 && communityId == 0 && uz.cybergram.SideMenu.enabled()) {
+                        uz.cybergram.SideMenu.show(DialogsActivity.this);
                     } else if (onlySelect || folderId != 0 || communityId != 0) {
                         finishFragment();
                     }

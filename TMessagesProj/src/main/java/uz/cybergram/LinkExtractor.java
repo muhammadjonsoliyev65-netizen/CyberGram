@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class LinkExtractor {
 
     private static final Pattern URL = Pattern.compile(
-            "(?i)((?:https?://|www\\.)[^\\s<>\"']+|\\b(?:[a-z0-9-]+\\.)+[a-z]{2,24}\\b(?:/[^\\s<>\"']*)?)");
+            "(?i)((?:https?://|www\\.)[^\\s<>\"']+|\\b(?:[\\p{L}\\p{N}-]+\\.)+(?:[a-z]{2,24}|xn--[a-z0-9-]+)\\b(?:/[^\\s<>\"']*)?)");
 
     private LinkExtractor() {
     }

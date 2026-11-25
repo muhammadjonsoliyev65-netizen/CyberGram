@@ -148,7 +148,7 @@ public final class CyberMenu {
     }
 
     private static void message(Context context, String title, CharSequence text) {
-        try { 
+        try {
             AlertDialog.Builder builder = new AlertDialog.Builder(context);
             builder.setTitle(title);
             builder.setMessage(text);

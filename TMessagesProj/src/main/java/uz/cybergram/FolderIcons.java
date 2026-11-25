@@ -20,10 +20,11 @@ public final class FolderIcons {
         String name = filter.name.trim();
         String emoji = leadingEmoji(name);
         if (emoji != null) {
-            return name;
+            return name; // nomda emoji bor — o'zini ko'rsatamiz
         }
         return icon(filter) + " " + name;
     }
+
     public static String icon(MessagesController.DialogFilter filter) {
         if (filter == null) {
             return "📁";
