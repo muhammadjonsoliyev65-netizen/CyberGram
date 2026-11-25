@@ -1,46 +1,43 @@
-## Telegram messenger for Android
+# CyberGram
 
-[Telegram](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple and free.
-This repo contains the official source code for [Telegram App for Android](https://play.google.com/store/apps/details?id=org.telegram.messenger).
+**CyberGram** — Telegram API asosida ishlaydigan **norasmiy** Android ilova. U O'zbekistonda keng tarqalgan firibgarliklardan (soxta havolalar, SMS o'g'irlovchi APK fayllar, "sovrin yutdingiz" xabarlari) himoya qilishga qaratilgan.
 
-## Creating your Telegram Application
+> ⚠️ CyberGram Telegram kompaniyasining rasmiy ilovasi emas va unga aloqador emas. Ilova [Telegram API](https://core.telegram.org/api) dan foydalanadi va [DrKLO/Telegram](https://github.com/DrKLO/Telegram) (13.2.2) ochiq kodi asosida qurilgan.
 
-We welcome all developers to use our API and source code to create applications on our platform.
-There are several things we require from **all developers** for the moment.
+*Unofficial Telegram client based on the Telegram API and the open-source code of DrKLO/Telegram (13.2.2). Not affiliated with Telegram.*
 
-1. [**Obtain your own api_id**](https://core.telegram.org/api/obtaining_api_id) for your application.
-2. Please **do not** use the name Telegram for your app — or make sure your users understand that it is unofficial.
-3. Kindly **do not** use our standard logo (white paper plane in a blue circle) as your app's logo.
-3. Please study our [**security guidelines**](https://core.telegram.org/mtproto/security_guidelines) and take good care of your users' data and privacy.
-4. Please remember to publish **your** code too in order to comply with the licences.
+---
 
-### API, Protocol documentation
+## Imkoniyatlar
 
-Telegram API manuals: https://core.telegram.org/api
+- 🛡 **Xabar tekshiruvi** — har bir xabarda oflayn tekshiruv belgisi (🟢 / 🟡 / 🔴).
+- 🔗 **Havola qo'riqchisi** — xavfli yoki notanish saytlar avtomatik ochilmaydi, avval ogohlantiradi.
+- 📦 **APK / Fayl qo'riqchisi** — APK fayllardagi xavfli ruxsatlarni (SMS o'qish, Accessibility va boshqalar), niqoblangan fayllarni (`hujjat.pdf.exe`) va soxta bank/to'lov ilovalarini aniqlaydi.
+- 🤖 **AI tekshiruv** (ixtiyoriy, rozilik bilan) — faqat havolalar va fayl nomlari tahlil qilinadi.
+- 🌐 O'zbek va rus tillari.
 
-MTproto protocol manuals: https://core.telegram.org/mtproto
+## Maxfiylik
 
-### Compilation Guide
+- **Xabarlaringiz matni hech qayerga yuborilmaydi.**
+- AI tekshiruvga faqat havola (so'rov parametrlarisiz) va fayl nomi yuboriladi.
+- Karta raqami, telefon, email kabi ma'lumotlar telefonning o'zida yashiriladi.
+- Ba'zi ogohlantirishlar Google Safe Browsing orqali beriladi: [Advisory provided by Google](https://developers.google.com/safe-browsing/v4/advisory).
+- 100% himoya kafolati yo'q — shubhali havola va fayllarga doim ehtiyot bo'ling.
 
-**Note**: In order to support [reproducible builds](https://core.telegram.org/reproducible-builds), this repo contains dummy release.keystore,  google-services.json and filled variables inside BuildVars.java. Before publishing your own APKs please make sure to replace all these files with your own.
+## O'zingiz yig'ish (build)
 
-You will require Android Studio 2025.1.4, Android NDK 27.2.12479018 and Android SDK 36.
+1. [my.telegram.org](https://my.telegram.org) dan o'z `api_id` va `api_hash` ingizni oling.
+2. Loyiha ildizida `local.properties` faylini yarating va o'z kalitlaringizni yozing (qaysi nomlar o'qilishini `TMessagesProj/build.gradle` dan ko'ring).
+3. [Firebase](https://console.firebase.google.com) da o'z loyihangizni yarating va `google-services.json` ni `TMessagesProj_App/` ga qo'ying.
+4. Android Studio'da oching va `TMessagesProj_App` modulini yig'ing.
 
-1. Clone the Telegram source code with its submodules:
-   ```bash
-   git clone --recursive --shallow-submodules https://github.com/DrKLO/Telegram.git Telegram
-   ```
-   In case you forgot the `--recursive` flag, change to the `Telegram` directory and run:
-   ```bash
-   git submodule init && git submodule update --init --recursive --depth=1
-   ```
-2. Copy your release.keystore into TMessagesProj/config
-3. Fill out RELEASE_KEY_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_STORE_PASSWORD in gradle.properties to access your  release.keystore
-4.  Go to https://console.firebase.google.com/, create two android apps with application IDs org.telegram.messenger and org.telegram.messenger.beta, turn on firebase messaging and download google-services.json, which should be copied to the same folder as TMessagesProj.
-5. Open the project in the Studio (note that it should be opened, NOT imported).
-6. Fill out values in TMessagesProj/src/main/java/org/telegram/messenger/BuildVars.java – there’s a link for each of the variables showing where and which data to obtain.
-7. You are ready to compile Telegram.
+Kalitlar, `local.properties`, `google-services.json` va imzo kaliti (`.jks`) bu repoga kiritilmagan.
 
-### Localization
+## Litsenziya
 
-We moved all translations to https://translations.telegram.org/en/android/. Please use it.
+GNU GPL v2 — [LICENSE](LICENSE) ga qarang. Asl kod: © Telegram FZ-LLC va DrKLO/Telegram mualliflari.
+
+## Aloqa
+
+- 📢 Yangiliklar: [@CyberGramNews](https://t.me/CyberGramNews)
+- 💬 Yordam: [@CYBERGRAMUZ](https://t.me/CYBERGRAMUZ)
