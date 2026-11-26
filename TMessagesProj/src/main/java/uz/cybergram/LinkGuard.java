@@ -68,30 +68,31 @@ public final class LinkGuard {
         }
 
         final String normalized = SafeBrowsingClient.normalize(url);
-        final boolean online = CyberSettings.onlineCheck(context);
+        final boolean online = CyberSettings.onlineCheck(context) && isNetworkOnline();
+        final boolean knownEstablished = UrlCheck.isKnownEstablished(host);
         final boolean useSafeBrowsing = online && normalized != null && SafeBrowsingClient.isConfigured();
-        final boolean useServer = online && CyberApiClient.isConfigured() && !host.isEmpty() && !TrustedSites.isTrusted(host);
+        final boolean useServer = online && !knownEstablished && CyberApiClient.isConfigured() && !host.isEmpty()
+                && !TrustedSites.isTrusted(host);
         if (!useSafeBrowsing && !useServer) {
             if (result.verdict == SafetyVerdict.SAFE) {
-                return askIfUnknown(activity, url, host, result, openAnyway, false);
+                return askIfUnknown(activity, url, host, result, openAnyway, knownEstablished);
             }
             showDialog(activity, url, result, openAnyway);
             return true;
         }
 
-        // Onlayn tekshiruv: 1) Google Safe Browsing, 2) CyberGram server (sayt yoshi, sahifadagi formalar)
+        // Onlayn tekshiruv: Google Safe Browsing va CyberGram server BIR VAQTDA (parallel) ishlaydi —
+        // sekin internetda kutish ikki baravar qisqaradi. Ikkalasi tugagach (yoki vaqt o'tgach) natija chiqadi.
         final AlertDialog loader = new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER);
         loader.setCanCancel(false);
         loader.show();
-        final Runnable serverStep = () -> {
-            if (!useServer) {
-                finish(activity, loader, url, host, result, openAnyway, false);
-                return;
+        final int[] pending = {(useSafeBrowsing ? 1 : 0) + (useServer ? 1 : 0)};
+        final boolean[] established = {knownEstablished};
+        final Runnable oneDone = () -> {
+            pending[0]--;
+            if (pending[0] == 0) {
+                finish(activity, loader, url, host, result, openAnyway, established[0]);
             }
-            UrlCheck.check(url, info -> {
-                boolean established = UrlCheck.apply(info, result);
-                finish(activity, loader, url, host, result, openAnyway, established);
-            });
         };
         if (useSafeBrowsing) {
             SafeBrowsingClient.check(Collections.singletonList(url), (threats, ok) -> {
@@ -99,12 +100,28 @@ public final class LinkGuard {
                 if (threat != null) {
                     result.addOnline(url, threat);
                 }
-                serverStep.run();
+                oneDone.run();
             });
-        } else {
-            serverStep.run();
+        }
+        if (useServer) {
+            UrlCheck.check(url, info -> {
+                if (UrlCheck.apply(info, result)) {
+                    established[0] = true;
+                    UrlCheck.rememberEstablished(host);
+                }
+                oneDone.run();
+            });
         }
         return true;
+    }
+
+    /** Internet umuman yo'q bo'lsa, onlayn tekshiruvni kutib o'tirmaymiz. */
+    private static boolean isNetworkOnline() {
+        try {
+            return org.telegram.messenger.ApplicationLoader.isNetworkOnline();
+        } catch (Throwable e) {
+            return true;
+        }
     }
 
     private static void finish(Activity activity, AlertDialog loader, String url, String host, LocalRules.Result result,

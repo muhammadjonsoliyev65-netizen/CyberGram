@@ -358,7 +358,7 @@ public final class FileGuard {
         }
         if (r.sha256 != null) {
             // Faqat faylning "barmoq izi" (SHA-256) ochiladi — faylning o'zi hech qayerga yuborilmaydi
-            builder.setNeutralButton("🔎 VirusTotal", (d, w) -> Browser.openUrl(activity, "https://www.virustotal.com/gui/file/" + r.sha256));
+            builder.setNeutralButton(L.t("🔎 70+ antivirus bilan tekshirish", "🔎 Проверить 70+ антивирусами"), (d, w) -> Browser.openUrl(activity, "https://www.virustotal.com/gui/file/" + r.sha256));
         }
         builder.show();
     }

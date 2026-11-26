@@ -24,7 +24,7 @@ public final class TrustedSites {
             // Telegram
             "t.me", "telegram.me", "telegram.org", "telegra.ph", "fragment.com",
             // Xalqaro
-            "google.com", "google.co.uz", "youtube.com", "youtu.be", "wikipedia.org", "github.com",
+            "google.com", "google.co.uz", "youtube.com", "youtu.be", "wikipedia.org", "github.com", "virustotal.com",
             "instagram.com", "facebook.com", "x.com", "twitter.com", "linkedin.com", "tiktok.com",
             "apple.com", "microsoft.com", "live.com", "office.com", "yandex.uz", "yandex.ru", "yandex.com",
             "vk.com", "spotify.com", "netflix.com", "amazon.com", "coursera.org", "udemy.com",

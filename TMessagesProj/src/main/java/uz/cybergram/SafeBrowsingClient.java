@@ -160,8 +160,8 @@ public final class SafeBrowsingClient {
 
         HttpURLConnection connection = (HttpURLConnection) new URL(ENDPOINT + BuildConfig.SAFE_BROWSING_KEY).openConnection();
         try {
-            connection.setConnectTimeout(4000);
-            connection.setReadTimeout(4000);
+            connection.setConnectTimeout(3500);
+            connection.setReadTimeout(3500);
             connection.setRequestMethod("POST");
             connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type", "application/json");

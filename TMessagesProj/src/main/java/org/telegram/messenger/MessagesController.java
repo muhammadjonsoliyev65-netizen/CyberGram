@@ -1313,7 +1313,7 @@ public class MessagesController extends BaseController implements NotificationCe
             if (alwaysShow.contains(dialogId)) {
                 return true;
             }
-            if (d.folder_id != 0 && (flags & DIALOG_FILTER_FLAG_EXCLUDE_ARCHIVED) != 0) {
+            if (d.folder_id != 0 && ((flags & DIALOG_FILTER_FLAG_EXCLUDE_ARCHIVED) != 0 || uz.cybergram.CyberSettings.hideArchivedInFolders())) {
                 return false;
             }
             MessagesController messagesController = accountInstance.getMessagesController();

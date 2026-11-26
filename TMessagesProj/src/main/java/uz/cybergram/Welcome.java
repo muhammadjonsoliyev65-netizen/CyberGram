@@ -18,7 +18,7 @@ public final class Welcome {
     private static final String[] TITLES_UZ = {
             "🛡 CyberGram'ga xush kelibsiz!",
             "🔗 Havolalar va AI",
-            "👻 Maxfiylik va yordam"
+            "🔒 Maxfiylik va yordam"
     };
 
     private static final String[] PAGES_UZ = {
@@ -35,9 +35,9 @@ public final class Welcome {
                     + "• Havola yoki .apk fayl bor xabarda 🛡 → \"🤖 AI tahlili\" ni bosib, sun'iy intellekt fikrini olishingiz mumkin.\n\n"
                     + "• AI'ga faqat havola manzillari va fayl nomi yuboriladi — xabar matni emas.",
 
-            "• Chatlar ro'yxati tepasidagi 🛡 tugma — CyberGram menyusi: AI yordamchi, rasmiy kanallar, 👻 maxfiylik rejimi va sozlamalar.\n\n"
+            "• Chatlar ro'yxati tepasidagi 🛡 tugma — CyberGram menyusi: AI yordamchi, rasmiy kanallar va sozlamalar.\n\n"
                     + "• Oflayn tekshiruv telefoningizda bajariladi. AI'ga ma'lumot faqat siz tugmani bosganingizda yuboriladi.\n\n"
-                    + "• CyberGram — norasmiy ilova: Telegram API asosida ishlaydi va Telegram ekotizimining bir qismi.\n\n"
+                    + "• CyberGram — Telegram API asosida ishlaydigan norasmiy ilova va Telegram ekotizimining bir qismi. Uni Telegram jamoasi ishlab chiqmagan.\n\n"
                     + "📢 Yangiliklar: @CyberGramNews\n"
                     + "💬 Savollar: @CYBERGRAMUZ"
     };
@@ -45,7 +45,7 @@ public final class Welcome {
     private static final String[] TITLES_RU = {
             "🛡 Добро пожаловать в CyberGram!",
             "🔗 Ссылки и ИИ",
-            "👻 Приватность и помощь"
+            "🔒 Приватность и помощь"
     };
 
     private static final String[] PAGES_RU = {
@@ -62,9 +62,9 @@ public final class Welcome {
                     + "• В сообщении со ссылкой или .apk-файлом нажмите 🛡 → «🤖 Анализ ИИ», чтобы получить мнение искусственного интеллекта.\n\n"
                     + "• ИИ получает только адреса ссылок и имя файла — не текст сообщения.",
 
-            "• Кнопка 🛡 над списком чатов — меню CyberGram: ИИ-помощник, официальные каналы, 👻 режим приватности и настройки.\n\n"
+            "• Кнопка 🛡 над списком чатов — меню CyberGram: ИИ-помощник, официальные каналы и настройки.\n\n"
                     + "• Офлайн-проверка выполняется на вашем телефоне. Данные отправляются ИИ только когда вы нажимаете кнопку.\n\n"
-                    + "• CyberGram — неофициальное приложение: работает на Telegram API и является частью экосистемы Telegram.\n\n"
+                    + "• CyberGram — неофициальное приложение на Telegram API, часть экосистемы Telegram. Его разработала не команда Telegram.\n\n"
                     + "📢 Новости: @CyberGramNews\n"
                     + "💬 Вопросы: @CYBERGRAMUZ"
     };

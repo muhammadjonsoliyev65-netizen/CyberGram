@@ -26,6 +26,8 @@ import org.telegram.PhoneFormat.PhoneFormat;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.UserConfig;
+import org.telegram.messenger.MessagesStorage;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
 import org.telegram.tgnet.TLRPC;
@@ -36,9 +38,14 @@ import org.telegram.ui.CallLogActivity;
 import org.telegram.ui.ChatActivity;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.ContactsActivity;
+import org.telegram.ui.DialogsActivity;
 import org.telegram.ui.FiltersSetupActivity;
 import org.telegram.ui.GroupCreateActivity;
+import org.telegram.ui.LaunchActivity;
+import org.telegram.ui.LoginActivity;
+import org.telegram.ui.ThemeActivity;
 import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.SettingsActivity;
 
@@ -67,6 +74,88 @@ public final class SideMenu {
 
     public static void setEnabled(boolean value) {
         prefs().edit().putBoolean(KEY, value).apply();
+    }
+
+    // --- Sarlavha rangi (foydalanuvchi tanlaydi) ---
+    private static final String KEY_COLOR = "side_color";
+    private static final int[][] PALETTE = {
+            {0xFF4A90D9, 0xFF2F6DB5}, // Ko'k
+            {0xFF8E6CEF, 0xFF5E3FC4}, // Binafsha
+            {0xFF3CC37A, 0xFF1F8F55}, // Yashil
+            {0xFF2EC4C9, 0xFF16858F}, // Moviy (feruza)
+            {0xFFFF9F45, 0xFFE06A1B}, // To'q sariq
+            {0xFFF25C5C, 0xFFC23535}, // Qizil
+            {0xFFF06EA9, 0xFFC23F7E}, // Pushti
+            {0xFF4A5568, 0xFF262C36}, // Grafit (to'q)
+    };
+
+    public static CharSequence[] colorNames() {
+        return new CharSequence[]{
+                L.t("🔵 Ko'k", "🔵 Синий"), L.t("🟣 Binafsha", "🟣 Фиолетовый"), L.t("🟢 Yashil", "🟢 Зелёный"),
+                L.t("🩵 Feruza", "🩵 Бирюзовый"), L.t("🟠 To'q sariq", "🟠 Оранжевый"), L.t("🔴 Qizil", "🔴 Красный"),
+                L.t("🩷 Pushti", "🩷 Розовый"), L.t("⚫ Grafit", "⚫ Графит"), L.t("🎨 Mavzu rangi (Telegram mavzusi bo'yicha)", "🎨 Цвет темы Telegram")
+        };
+    }
+
+    public static int getColorIndex() {
+        try {
+            return prefs().getInt(KEY_COLOR, 0);
+        } catch (Throwable e) {
+            return 0;
+        }
+    }
+
+    public static void setColorIndex(int index) {
+        prefs().edit().putInt(KEY_COLOR, index).apply();
+    }
+
+    private static int[] headerColors() {
+        int i = getColorIndex();
+        if (i >= 0 && i < PALETTE.length) {
+            return PALETTE[i];
+        }
+        // Mavzu rangi: Telegram mavzusining sarlavha rangi; juda och bo'lsa matn ko'rinmay qoladi, shuning uchun qorong'ilashtiramiz
+        int c = Theme.getColor(Theme.key_actionBarDefault);
+        if (luminance(c) > 0.6f) {
+            c = Theme.getColor(Theme.key_chats_actionBackground);
+        }
+        if (luminance(c) > 0.6f) {
+            return PALETTE[0];
+        }
+        return new int[]{c, darker(c)};
+    }
+
+    private static float luminance(int c) {
+        return (0.299f * Color.red(c) + 0.587f * Color.green(c) + 0.114f * Color.blue(c)) / 255f;
+    }
+
+    private static int darker(int c) {
+        return Color.rgb((int) (Color.red(c) * 0.78f), (int) (Color.green(c) * 0.78f), (int) (Color.blue(c) * 0.78f));
+    }
+
+    private static void applyHeaderColor(View header, GradientDrawable bg) {
+        bg.setColors(headerColors());
+        header.invalidate();
+    }
+
+    /** Rang tanlash oynasi (yon menyudagi 🎨 va CyberGram sozlamalaridan). */
+    public static void chooseColor(Context context, Runnable after) {
+        org.telegram.ui.ActionBar.AlertDialog.Builder b = new org.telegram.ui.ActionBar.AlertDialog.Builder(context);
+        b.setTitle(L.t("Yon menyu rangi", "Цвет бокового меню"));
+        CharSequence[] names = colorNames();
+        int cur = getColorIndex();
+        if (cur >= 0 && cur < names.length) {
+            names[cur] = names[cur] + "  ✓";
+        }
+        b.setItems(names, (d, which) -> {
+            setColorIndex(which);
+            d.dismiss();
+            if (after != null) {
+                after.run();
+            }
+        });
+        b.setPositiveButton(L.t("Yopish", "Закрыть"), (d, w) -> d.dismiss());
+        b.show();
     }
 
     private static SharedPreferences prefs() {
@@ -105,24 +194,26 @@ public final class SideMenu {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setBackgroundColor(bg);
 
-        // --- Sarlavha: ko'k fon, avatar, ism, telefon/username (status bar ostigacha) ---
-        LinearLayout header = new LinearLayout(activity);
-        header.setOrientation(LinearLayout.VERTICAL);
-        GradientDrawable headerBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{0xFF4A90D9, 0xFF2F6DB5});
+        // --- Sarlavha: ko'k fon, avatar, ism, telefon; o'ngda kun/tun va saqlanganlar, hisoblar strelkasi ---
+        FrameLayout header = new FrameLayout(activity);
+        final GradientDrawable headerBg = new GradientDrawable(GradientDrawable.Orientation.TL_BR, headerColors());
         header.setBackground(headerBg);
-        header.setPadding(dp(20), AndroidUtilities.statusBarHeight + dp(18), dp(20), dp(16));
+        header.setPadding(dp(20), AndroidUtilities.statusBarHeight + dp(18), dp(16), dp(14));
 
         TLRPC.User me = null;
         try {
             me = UserConfig.getInstance(account).getCurrentUser();
         } catch (Throwable ignore) {
         }
+        LinearLayout headerCol = new LinearLayout(activity);
+        headerCol.setOrientation(LinearLayout.VERTICAL);
         BackupImageView avatar = new BackupImageView(activity);
         avatar.setRoundRadius(dp(32));
         if (me != null) {
             avatar.setForUserOrChat(me, new AvatarDrawable(me));
         }
-        header.addView(avatar, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        avatar.setOnClickListener(v -> close(() -> openProfile(fragment, account)));
+        headerCol.addView(avatar, new LinearLayout.LayoutParams(dp(64), dp(64)));
 
         TextView name = new TextView(activity);
         name.setTextColor(Color.WHITE);
@@ -133,7 +224,8 @@ public final class SideMenu {
         name.setText(me != null ? UserObject.getUserName(me) : "CyberGram");
         LinearLayout.LayoutParams nameLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         nameLp.topMargin = dp(14);
-        header.addView(name, nameLp);
+        nameLp.rightMargin = dp(44);
+        headerCol.addView(name, nameLp);
 
         TextView sub = new TextView(activity);
         sub.setTextColor(0xCCFFFFFF);
@@ -153,8 +245,38 @@ public final class SideMenu {
         sub.setText(subText != null ? subText : L.t("Profilni ko'rish", "Открыть профиль"));
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         subLp.topMargin = dp(2);
-        header.addView(sub, subLp);
-        header.setOnClickListener(v -> close(() -> openProfile(fragment, account)));
+        subLp.rightMargin = dp(44);
+        headerCol.addView(sub, subLp);
+        header.addView(headerCol, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        // Kun/tun rejimi
+        ImageView themeBtn = new ImageView(activity);
+        themeBtn.setScaleType(ImageView.ScaleType.CENTER);
+        themeBtn.setImageResource(Theme.isCurrentThemeDark() ? R.drawable.menu_day_mode_24 : R.drawable.menu_night_mode_24);
+        themeBtn.setColorFilter(Color.WHITE);
+        themeBtn.setBackground(Theme.createSelectorDrawable(0x33FFFFFF, 1));
+        themeBtn.setOnClickListener(v -> toggleTheme(fragment, v));
+        header.addView(themeBtn, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END));
+
+        // Sarlavha rangini tanlash (🎨)
+        TextView colorBtn = new TextView(activity);
+        colorBtn.setText("🎨");
+        colorBtn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        colorBtn.setGravity(Gravity.CENTER);
+        colorBtn.setBackground(Theme.createSelectorDrawable(0x33FFFFFF, 1));
+        colorBtn.setOnClickListener(v -> chooseColor(activity, () -> applyHeaderColor(header, headerBg)));
+        FrameLayout.LayoutParams colorLp = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.END);
+        colorLp.topMargin = dp(48);
+        header.addView(colorBtn, colorLp);
+
+        // Hisoblar ro'yxatini ochish/yopish strelkasi
+        final TextView arrow = new TextView(activity);
+        arrow.setTextColor(Color.WHITE);
+        arrow.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setText(accountsOpen ? "▲" : "▼");
+        arrow.setBackground(Theme.createSelectorDrawable(0x33FFFFFF, 1));
+        header.addView(arrow, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.BOTTOM | Gravity.END));
         panel.addView(header);
 
         // --- Bo'limlar ---
@@ -163,6 +285,19 @@ public final class SideMenu {
         list.setOrientation(LinearLayout.VERTICAL);
         list.setPadding(0, dp(6), 0, dp(6));
         scroll.addView(list);
+
+        final LinearLayout accountsBox = new LinearLayout(activity);
+        accountsBox.setOrientation(LinearLayout.VERTICAL);
+        fillAccounts(accountsBox, fragment, account, text, gray);
+        accountsBox.setVisibility(accountsOpen ? View.VISIBLE : View.GONE);
+        list.addView(accountsBox);
+        View.OnClickListener toggleAccounts = v -> {
+            accountsOpen = !accountsOpen;
+            accountsBox.setVisibility(accountsOpen ? View.VISIBLE : View.GONE);
+            arrow.setText(accountsOpen ? "▲" : "▼");
+        };
+        arrow.setOnClickListener(toggleAccounts);
+        headerCol.setOnClickListener(toggleAccounts);
 
         addItem(list, R.drawable.settings_account, C_BLUE, L.t("Profilim", "Мой профиль"), text, () -> openProfile(fragment, account));
         addDivider(list, gray);
@@ -177,11 +312,8 @@ public final class SideMenu {
             fragment.presentFragment(new ContactsActivity(args));
         });
         addItem(list, R.drawable.msg_calls, C_GREEN, L.t("Qo'ng'iroqlar", "Звонки"), text, () -> fragment.presentFragment(new CallLogActivity()));
-        addItem(list, R.drawable.outline_saved_24, C_INDIGO, L.t("Saqlangan xabarlar", "Избранное"), text, () -> {
-            Bundle args = new Bundle();
-            args.putLong("user_id", UserConfig.getInstance(account).getClientUserId());
-            fragment.presentFragment(new ChatActivity(args));
-        });
+        addItem(list, R.drawable.outline_saved_24, C_INDIGO, L.t("Saqlangan xabarlar", "Избранное"), text, () -> openSaved(fragment, account));
+        addItem(list, R.drawable.msg_archive, C_TEAL, L.t("Arxivlangan chatlar", "Архив чатов"), text, () -> openArchive(fragment));
         addItem(list, R.drawable.settings_folders, C_PURPLE, L.t("Chat jildlari", "Папки с чатами"), text, () -> fragment.presentFragment(new FiltersSetupActivity()));
         addItem(list, R.drawable.msg_settings_old, C_GRAY, L.t("Sozlamalar", "Настройки"), text, () -> fragment.presentFragment(new SettingsActivity()));
         addDivider(list, gray);
@@ -242,6 +374,130 @@ public final class SideMenu {
         panel.animate().translationX(0).setDuration(220).start();
         panelRef = panel;
         panelWidth = width;
+    }
+
+    private static boolean accountsOpen;
+
+    /** Hisoblar ro'yxati: har bir faol hisob, o'qilmaganlar soni, "Hisob qo'shish". */
+    private static void fillAccounts(LinearLayout box, final BaseFragment fragment, final int current, int textColor, int gray) {
+        Context context = box.getContext();
+        int active = 0;
+        for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+            final int acc = a;
+            UserConfig config = UserConfig.getInstance(a);
+            if (!config.isClientActivated()) {
+                continue;
+            }
+            active++;
+            TLRPC.User user = config.getCurrentUser();
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(18), 0, dp(16), 0);
+            row.setBackground(Theme.getSelectorDrawable(false));
+
+            BackupImageView av = new BackupImageView(context);
+            av.setRoundRadius(dp(18));
+            if (user != null) {
+                av.setForUserOrChat(user, new AvatarDrawable(user));
+            }
+            row.addView(av, new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+            TextView label = new TextView(context);
+            label.setText((user != null ? UserObject.getUserName(user) : "—") + (a == current ? "  ✓" : ""));
+            label.setTextColor(textColor);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            label.setSingleLine(true);
+            label.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            labelLp.leftMargin = dp(18);
+            row.addView(label, labelLp);
+
+            int unread = 0;
+            try {
+                unread = MessagesStorage.getInstance(a).getMainUnreadCount();
+            } catch (Throwable ignore) {
+            }
+            if (unread > 0 && a != current) {
+                TextView badge = new TextView(context);
+                badge.setText(unread > 999 ? "999+" : String.valueOf(unread));
+                badge.setTextColor(Color.WHITE);
+                badge.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                badge.setTypeface(AndroidUtilities.bold());
+                badge.setGravity(Gravity.CENTER);
+                badge.setPadding(dp(8), dp(2), dp(8), dp(2));
+                GradientDrawable bb = new GradientDrawable();
+                bb.setColor(C_BLUE);
+                bb.setCornerRadius(dp(12));
+                badge.setBackground(bb);
+                row.addView(badge, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(24)));
+            }
+            row.setOnClickListener(v -> close(() -> {
+                if (acc != current && LaunchActivity.instance != null) {
+                    LaunchActivity.instance.switchToAccount(acc, true);
+                }
+            }));
+            box.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+        }
+        if (active < UserConfig.getMaxAccountCount()) {
+            addItem(box, R.drawable.menu_add_tab_24, C_GRAY, L.t("Hisob qo'shish", "Добавить аккаунт"), textColor, () -> {
+                for (int a = 0; a < UserConfig.MAX_ACCOUNT_COUNT; a++) {
+                    if (!UserConfig.getInstance(a).isClientActivated()) {
+                        fragment.presentFragment(new LoginActivity(a));
+                        return;
+                    }
+                }
+            });
+        }
+        addDivider(box, gray);
+    }
+
+    private static void openArchive(BaseFragment fragment) {
+        Bundle args = new Bundle();
+        args.putInt("folderId", 1);
+        fragment.presentFragment(new DialogsActivity(args));
+    }
+
+    private static void openSaved(BaseFragment fragment, int account) {
+        Bundle args = new Bundle();
+        args.putLong("user_id", UserConfig.getInstance(account).getClientUserId());
+        fragment.presentFragment(new ChatActivity(args));
+    }
+
+    /** Kun/tun rejimini almashtirish (Telegram'ning o'z mexanizmi orqali). */
+    private static void toggleTheme(BaseFragment fragment, View from) {
+        try {
+            SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("themeconfig", Context.MODE_PRIVATE);
+            String dayThemeName = preferences.getString("lastDayTheme", "Blue");
+            if (Theme.getTheme(dayThemeName) == null || Theme.getTheme(dayThemeName).isDark()) {
+                dayThemeName = "Blue";
+            }
+            String nightThemeName = preferences.getString("lastDarkTheme", "Dark Blue");
+            if (Theme.getTheme(nightThemeName) == null || !Theme.getTheme(nightThemeName).isDark()) {
+                nightThemeName = "Dark Blue";
+            }
+            Theme.ThemeInfo themeInfo = Theme.getActiveTheme();
+            if (dayThemeName.equals(nightThemeName)) {
+                if (themeInfo.isDark() || dayThemeName.equals("Dark Blue") || dayThemeName.equals("Night")) {
+                    dayThemeName = "Blue";
+                } else {
+                    nightThemeName = "Dark Blue";
+                }
+            }
+            boolean toDark = dayThemeName.equals(themeInfo.getKey());
+            themeInfo = Theme.getTheme(toDark ? nightThemeName : dayThemeName);
+            int[] pos = new int[2];
+            from.getLocationInWindow(pos);
+            pos[0] += from.getMeasuredWidth() / 2;
+            pos[1] += from.getMeasuredHeight() / 2;
+            final Theme.ThemeInfo target = themeInfo;
+            final boolean dark = toDark;
+            close(() -> {
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needSetDayNightTheme, target, false, pos, -1, dark, null, null, null, true);
+                Theme.turnOffAutoNight(BulletinFactory.of(fragment), () -> fragment.presentFragment(new ThemeActivity(ThemeActivity.THEME_TYPE_NIGHT)));
+            });
+        } catch (Throwable ignore) {
+        }
     }
 
     private static View panelRef;

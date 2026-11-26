@@ -16,6 +16,8 @@ public final class CyberSettings {
     private static final String AI = "ai_enabled";
     private static final String ASK_UNKNOWN = "ask_unknown_sites";
     private static final String AI_CONSENT = "ai_consent_v2";
+    private static final String HIDE_ARCHIVED = "hide_archived_in_folders";
+    private static volatile Boolean hideArchivedCache;
 
     private CyberSettings() {
     }
@@ -44,6 +46,24 @@ public final class CyberSettings {
         return context == null || prefs(context).getBoolean(AI, true);
     }
 
+    /**
+     * Arxivlangan chatlar jildlarda (tablarda) ko'rinmasin. Har bir jildda qo'lda "Arxivlangan"ni
+     * chiqarib tashlash shart emas. Jildga alohida qo'shilgan chat baribir ko'rinadi.
+     * MessagesController.DialogFilter.includesDialog dan chaqiriladi, shuning uchun tez ishlashi kerak.
+     */
+    public static boolean hideArchivedInFolders() {
+        Boolean v = hideArchivedCache;
+        if (v == null) {
+            try {
+                v = prefs(org.telegram.messenger.ApplicationLoader.applicationContext).getBoolean(HIDE_ARCHIVED, true);
+            } catch (Throwable e) {
+                v = true;
+            }
+            hideArchivedCache = v;
+        }
+        return v;
+    }
+
     public static void show(final Context context) {
         final SharedPreferences p = prefs(context);
         final boolean guard = p.getBoolean(LINK_GUARD, true);
@@ -52,6 +72,7 @@ public final class CyberSettings {
         final boolean ask = p.getBoolean(ASK_UNKNOWN, true);
         final boolean consent = p.getBoolean(AI_CONSENT, false);
         final boolean side = SideMenu.enabled();
+        final boolean hideArch = hideArchivedInFolders();
 
         CharSequence[] items = new CharSequence[]{
                 (guard ? "✅" : "⬜") + L.t(" Havolalarni avtomatik tekshirish", " Автоматическая проверка ссылок"),
@@ -59,6 +80,8 @@ public final class CyberSettings {
                 (ai ? "✅" : "⬜") + L.t(" AI funksiyalari", " Функции ИИ"),
                 (ask ? "✅" : "⬜") + L.t(" Notanish saytni ochishdan oldin so'rash", " Спрашивать перед открытием незнакомых сайтов"),
                 (side ? "✅" : "⬜") + L.t(" ☰ Yon menyu (pastki panel o'rniga)", " ☰ Боковое меню (вместо нижней панели)"),
+                L.t("🎨 Yon menyu rangi", "🎨 Цвет бокового меню"),
+                (hideArch ? "✅" : "⬜") + L.t(" Arxivlangan chatlar jildlarda ko'rinmasin", " Не показывать архив в папках"),
                 consent ? L.t("🔄 AI roziligini bekor qilish", "🔄 Отозвать согласие на ИИ") : L.t("AI roziligi berilmagan", "Согласие на ИИ не дано")
         };
 
@@ -77,6 +100,19 @@ public final class CyberSettings {
             } else if (which == 4) {
                 SideMenu.setEnabled(!side);
                 android.widget.Toast.makeText(context, L.t("O'zgarish ilova qayta ochilganda kuchga kiradi.", "Изменение вступит в силу после перезапуска приложения."), android.widget.Toast.LENGTH_LONG).show();
+            } else if (which == 5) {
+                dialog.dismiss();
+                SideMenu.chooseColor(context, () -> show(context));
+                return;
+            } else if (which == 6) {
+                e.putBoolean(HIDE_ARCHIVED, !hideArch);
+                hideArchivedCache = !hideArch;
+                try {
+                    org.telegram.messenger.MessagesController.getInstance(org.telegram.messenger.UserConfig.selectedAccount).sortDialogs(null);
+                    org.telegram.messenger.NotificationCenter.getInstance(org.telegram.messenger.UserConfig.selectedAccount)
+                            .postNotificationName(org.telegram.messenger.NotificationCenter.dialogsNeedReload);
+                } catch (Throwable ignore) {
+                }
             } else if (consent) {
                 e.putBoolean(AI_CONSENT, false);
             }

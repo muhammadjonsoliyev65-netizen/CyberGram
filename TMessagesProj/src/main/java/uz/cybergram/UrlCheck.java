@@ -19,25 +19,87 @@ public final class UrlCheck {
         void onResult(JSONObject info);
     }
 
-    private static final long TIMEOUT_MS = 9000;
+    /** Sekin internetda ham uzoq kutmaslik uchun: 5 soniyadan keyin oflayn natija bilan davom etiladi. */
+    private static final long TIMEOUT_MS = 5000;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+
+    // Takroriy havolalar uchun xotira: bir xil havola 6 soat ichida qayta so'ralmaydi
+    private static final long MEM_TTL = 6L * 60 * 60 * 1000;
+    private static final java.util.Map<String, Object[]> MEM = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<String, Object[]>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(java.util.Map.Entry<String, Object[]> e) {
+                    return size() > 300;
+                }
+            });
+
+    // Uzoq yillik, toza saytlar (masalan kun.uz) 7 kun davomida serverga umuman so'ralmaydi — darhol ochiladi
+    private static final long EST_TTL = 7L * 24 * 60 * 60 * 1000;
+    private static final String PREFS = "cybergram_sites";
+
+    /** Bu sayt yaqinda "uzoq yillik va toza" deb topilganmi (serverga so'ramasdan). */
+    public static boolean isKnownEstablished(String host) {
+        if (host == null || host.isEmpty()) {
+            return false;
+        }
+        try {
+            long t = prefs().getLong("est_" + host.toLowerCase(java.util.Locale.ROOT), 0);
+            return t > 0 && System.currentTimeMillis() - t < EST_TTL;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    public static void rememberEstablished(String host) {
+        if (host == null || host.isEmpty()) {
+            return;
+        }
+        try {
+            prefs().edit().putLong("est_" + host.toLowerCase(java.util.Locale.ROOT), System.currentTimeMillis()).apply();
+        } catch (Throwable ignore) {
+        }
+    }
+
+    private static android.content.SharedPreferences prefs() {
+        return org.telegram.messenger.ApplicationLoader.applicationContext
+                .getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE);
+    }
 
     private UrlCheck() {
     }
 
-    /** Natija doim asosiy oqimda va faqat bir marta qaytadi (eng ko'pi 9 soniyada). */
+    /** Natija doim asosiy oqimda va faqat bir marta qaytadi (eng ko'pi 5 soniyada). */
     public static void check(String url, final Callback callback) {
+        final String key = Redact.url(url);
+        Object[] hit = MEM.get(key);
+        if (hit != null && System.currentTimeMillis() - (Long) hit[0] < MEM_TTL) {
+            final JSONObject cached = (JSONObject) hit[1];
+            MAIN.post(() -> callback.onResult(cached));
+            return;
+        }
         final AtomicBoolean done = new AtomicBoolean(false);
+        long timeout = TIMEOUT_MS;
+        try {
+            if (org.telegram.messenger.ApplicationLoader.isConnectionSlow()) {
+                timeout = 3500; // 2G/juda sekin internet — kamroq kutamiz
+            }
+        } catch (Throwable ignore) {
+        }
         MAIN.postDelayed(() -> {
             if (done.compareAndSet(false, true)) {
                 callback.onResult(null);
             }
-        }, TIMEOUT_MS);
-        CyberApiClient.post("/api/urlinfo", Redact.url(url), new CyberApiClient.Callback() {
+        }, timeout);
+        CyberApiClient.post("/api/urlinfo", key, new CyberApiClient.Callback() {
             @Override
             public void onSuccess(JSONObject response) {
+                JSONObject good = response != null && response.optBoolean("ok") ? response : null;
+                if (good != null) {
+                    // kech kelgan javob ham keyingi safar uchun saqlanadi
+                    MEM.put(key, new Object[]{System.currentTimeMillis(), good});
+                }
                 if (done.compareAndSet(false, true)) {
-                    callback.onResult(response != null && response.optBoolean("ok") ? response : null);
+                    callback.onResult(good);
                 }
             }
 

@@ -29,7 +29,6 @@ public final class CyberMenu {
         builder.setItems(new CharSequence[]{
                 L.t("🤖 Yordamchi (savol bering)", "🤖 Помощник (задайте вопрос)"),
                 L.t("📢 Rasmiy kanallar", "📢 Официальные каналы"),
-                L.t("👻 Maxfiylik rejimi", "👻 Режим приватности"),
                 L.t("⚙️ Sozlamalar", "⚙️ Настройки"),
                 L.t("ℹ️ Ilova haqida", "ℹ️ О приложении")
         }, (dialog, which) -> {
@@ -38,8 +37,6 @@ public final class CyberMenu {
             } else if (which == 1) {
                 showOfficialChannels(context);
             } else if (which == 2) {
-                PrivacyMode.show(context);
-            } else if (which == 3) {
                 CyberSettings.show(context);
             } else {
                 showAbout(context);
@@ -119,14 +116,14 @@ public final class CyberMenu {
         String version = BuildVars.BUILD_VERSION_STRING;
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle(L.t("ℹ️ CyberGram haqida", "ℹ️ О CyberGram"));
-        builder.setMessage("CyberGram " + version + "\n\n"
+        builder.setMessage("CyberGram " + UpdateChecker.VERSION_NAME + L.t(" (Telegram " + version + " asosida)", " (на основе Telegram " + version + ")") + "\n\n"
                 + L.t("CyberGram — Telegram API asosida ishlaydigan NORASMIY ilova va Telegram ekotizimining bir qismi. U Telegram'ning rasmiy ilovasi emas ", "CyberGram — НЕОФИЦИАЛЬНОЕ приложение на основе Telegram API, часть экосистемы Telegram. Это не официальное приложение Telegram ")
-                + L.t("va Telegram jamoasi bilan bog'liq emas. Ilova ochiq kodli Telegram for Android (GPL-2.0) asosida qurilgan.\n\n", "и оно не связано с командой Telegram. Приложение построено на открытом коде Telegram for Android (GPL-2.0).\n\n")
+                + L.t("va uni Telegram jamoasi ishlab chiqmagan. Ilova ochiq kodli Telegram for Android (GPL-2.0) asosida qurilgan.\n\n", "и его разработала не команда Telegram. Приложение построено на открытом коде Telegram for Android (GPL-2.0).\n\n")
                 + L.t("🛡 Xavfsizlik:\n", "🛡 Безопасность:\n")
                 + L.t("• Har bir xabar yonida avtomatik tekshiruv belgisi (🟢/🟡/🔴)\n", "• Значок автоматической проверки у каждого сообщения (🟢/🟡/🔴)\n")
                 + L.t("• Havolalar va tugmalardagi havolalar ochilishidan oldin tekshiriladi\n", "• Ссылки, в том числе в кнопках, проверяются перед открытием\n")
                 + L.t("• AI tahlili (havola va APK fayllar uchun) va AI yordamchi\n", "• Анализ ИИ (для ссылок и APK-файлов) и ИИ-помощник\n")
-                + L.t("• 👻 Maxfiylik rejimi — Telegram'ning rasmiy sozlamalari bir joyda\n\n", "• 👻 Режим приватности — официальные настройки Telegram в одном месте\n\n")
+                + "\n"
                 + L.t("🔒 Maxfiylik:\n", "🔒 Приватность:\n")
                 + L.t("• Oflayn tekshiruv telefonda bajariladi\n", "• Офлайн-проверка выполняется на телефоне\n")
                 + L.t("• Google Safe Browsing'ga faqat havola manzili yuboriladi\n", "• В Google Safe Browsing отправляется только адрес ссылки\n")

@@ -299,6 +299,8 @@ public class FilterTabsView extends FrameLayout {
         protected void onDraw(@NonNull Canvas canvas) {
             boolean reorderEnabled = true;
             boolean showRemove = !currentTab.isDefault && reorderEnabled;
+            final int cgSave = canvas.save();
+            uz.cybergram.TabStyle.apply(canvas, this, currentTab.title, currentTab.id, selectedTabId, previousId, manualScrollingToId, animatingIndicator, animatingIndicatorProgress);
             if (reorderEnabled && editingAnimationProgress != 0) {
                 canvas.save();
                 float p = editingAnimationProgress * (currentPosition % 2 == 0 ? 1.0f : -1.0f);
@@ -596,6 +598,7 @@ public class FilterTabsView extends FrameLayout {
                 }
 
             }
+            canvas.restoreToCount(cgSave);
         }
 
         private boolean attached;
@@ -1125,6 +1128,7 @@ public class FilterTabsView extends FrameLayout {
                 delegate.onSamePageSelected();
                 return;
             }
+            tabView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             scrollToTab(tabView.currentTab, position);
         });
         listView.setOnItemLongClickListener((view, position) -> {
@@ -1509,7 +1513,7 @@ public class FilterTabsView extends FrameLayout {
 
             final int y = height / 2 - dp(14);
             selectorDrawable.setBounds((int) (indicatorX - dp(TAB_INTERNAL_PADDING) - add), y, (int) (indicatorX + indicatorWidth + dp(TAB_INTERNAL_PADDING) + add), y + dp(28));
-            selectorDrawable.setAlpha(31);
+            selectorDrawable.setAlpha(uz.cybergram.TabStyle.SELECTOR_ALPHA);
             selectorDrawable.draw(canvas);
             canvas.restore();
         }
